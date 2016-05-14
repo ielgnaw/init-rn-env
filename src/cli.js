@@ -3,7 +3,7 @@
  * @author ielgnaw(wuji0223@gmail.com)
  */
 
-import {createReadStream} from 'fs';
+import {createReadStream,existsSync,statSync} from 'fs';
 import {resolve} from 'path';
 import chalk from 'chalk';
 import {log} from 'edp-core';
@@ -11,6 +11,7 @@ import sys from '../package';
 import {formatMsg, getCandidates, uniqueMsg} from './util';
 import {check} from './checker';
 import {exec} from 'child_process';
+import async from 'async';
 
 'use strict';
 
@@ -18,53 +19,59 @@ import {exec} from 'child_process';
  * 显示默认的信息
  */
 function showDefaultInfo() {
-    console.warn(sys);
-    console.log('');
+    console.log();
     console.log((sys.name + ' v' + sys.version));
     console.log(chalk.bold.green(formatMsg(sys.description)));
+    console.log();
+    console.log('Usage');
+    console.log();
+    console.log('Show default info');
+    console.log(chalk.white.bold('  $ ire'));
+    console.log();
+    console.log('Initialize react-native development environment in dirPath');
+    // console.log('under dirpath catalog, initialize react-native exploitation environment.');
+    console.log(chalk.white.bold('  $ ire dirPath'));
 }
-
 
 /**
- * 校验结果报告
+ * 获取当前系统的 npm registry 以及 disturl 配置
  *
- * @inner
- * @param {Object} errors 按文件类型为 key，值为对应的校验错误信息列表的对象
+ * @return {Promise} promise 对象
  */
-function report(errors) {
-    let t12 = true;
-
-    if (errors.length) {
-        errors.forEach((error) => {
-            log.info(error.path);
-            // error.messages = uniqueMsg(error.messages);
-            error.messages.forEach((message) => {
-                let ruleName = message.ruleName || '';
-                let msg = '→ ' + (ruleName ? chalk.bold(ruleName) + ': ' : '');
-                // 全局性的错误可能没有位置信息
-                if (typeof message.line === 'number') {
-                    msg += ('line ' + message.line);
-                    if (typeof message.col === 'number') {
-                        msg += (', col ' + message.col);
-                    }
-                    msg += ': ';
-                }
-
-                msg += message.colorMessage || message.message;
-                log.warn(msg);
-            });
+function getNpmConfig() {
+    return new Promise((resolve, reject) => {
+        async.parallel([
+            (cb) => {
+                exec('npm config get registry', (e, stdout, stderr) => {
+                    cb(e, stdout.replace(/\n*$/, ''));
+                });
+            },
+            (cb) => {
+                exec('npm config get disturl', (e, stdout, stderr) => {
+                    cb(e, stdout.replace(/\n*$/, ''));
+                });
+            }
+        ], (err, results) => {
+            if (err) {
+                return reject(err);
+            }
+            return resolve(results);
         });
-        t12 = false;
-    }
-
-    if (t12) {
-        log.info('Congratulations! Everything gone well, you are T12!');
-    }
-    else {
-        process.exit(1);
-    }
+    });
 }
 
+function runVerbose(root, projectName, rnPackage) {
+  var proc = spawn('npm', ['install', '--verbose', '--save', getInstallPackage(rnPackage)], {stdio: 'inherit'});
+  proc.on('close', function (code) {
+    if (code !== 0) {
+      console.error('`npm install --save react-native` failed');
+      return;
+    }
+
+    cli = require(CLI_MODULE_PATH());
+    cli.init(root, projectName);
+  });
+}
 
 /**
  * 解析参数。作为命令行执行的入口
@@ -74,90 +81,47 @@ function report(errors) {
 function parse(args) {
     args = args.slice(2);
 
-    // 不带参数时，默认检测当前目录下所有的 less 文件
     if (args.length === 0) {
-        args.push('.');
+        showDefaultInfo();
+        return;
     }
 
-    exec('npm config get registry', (e, stdout, stderr) => {
-        console.log(`stdout1: ${stdout}`);
-        console.log(`stderr2: ${stderr}`);
-        if (e !== null) {
-            console.log(`exec error: ${e}`);
-            process.exit(1);
+    // 只取第一个参数
+    let folderName = args[0];
+
+    let absolutePath = resolve(process.cwd(), folderName);
+
+    let shouldCreate = false;
+    let stat;
+    try {
+        stat = statSync(absolutePath);
+        if (!stat.isDirectory()) {
+            shouldCreate = true;
         }
+    }
+    catch (e) {
+        if (e.code === 'ENOENT') {
+            shouldCreate = true;
+        }
+    }
+
+    if (!shouldCreate) {
+        console.warn(`The folder ${chalk.bold.red(folderName)} is already exist, Please change the folder name.`);
+        return;
+    }
+
+    // 缓存默认的 npm config registry 以及 npm disturl 初始化环境后恢复
+    let npmRegistryOriginal;
+    let npmDisturlOriginal;
+
+    getNpmConfig().then((ret) => {
+        npmRegistryOriginal = ret[0];
+        npmDisturlOriginal = ret[1];
+        console.warn(npmRegistryOriginal, npmDisturlOriginal);
+    }, (err) => {
+        console.warn('err', err);
+        process.exit(1);
     });
-    // c.stdout.on('data', function (data) {
-    //     console.log('stdout22222: ' + data);
-    // });
-
-    // c.stderr.on('data', function (data) {
-    //     console.log('stderr11111: ' + data);
-    // });
-
-    // c.on('exit', function (code) {
-    //     console.log('child process exited with code ' + code);
-    // });
-
-    // exec('npm config get registry', (error, stdout, stderr) => {
-    //     console.log(`stdout1: ${stdout}`);
-    //     console.log(`stderr2: ${stderr}`);
-    //     if (error !== null) {
-    //         console.log(`exec error3: ${error}`);
-    //     }
-    // });
-
-    // console.warn(resolve(process.cwd(), 'node_modules', 'react-native', 'cli.js'));
-
-    // if (args[0] === '--version' || args[0] === '-v') {
-    //     showDefaultInfo();
-    //     return;
-    // }
-
-    // let patterns = [
-    //     '**/*.less',
-    //     '!**/{output,test,node_modules,asset,dist,release,doc,dep,report}/**'
-    // ];
-
-    // let candidates = getCandidates(args, patterns);
-
-    // let count = candidates.length;
-
-    // if (!count) {
-    //     return;
-    // }
-
-    // // 错误信息的集合
-    // let errors = [];
-
-    // /**
-    //  * 每个文件的校验结果回调，主要用于统计校验完成情况
-    //  *
-    //  * @inner
-    //  */
-    // let callback = () => {
-    //     count--;
-    //     if (!count) {
-    //         report(errors);
-    //     }
-    // };
-
-    // // 遍历每个需要检测的 less 文件
-    // candidates.forEach((candidate) => {
-    //     let readable = createReadStream(candidate, {
-    //         encoding: 'utf8'
-    //     });
-    //     readable.on('data', (chunk) => {
-    //         let file = {
-    //             content: chunk,
-    //             path: candidate
-    //         };
-    //         check(file, errors, callback);
-    //     });
-    //     readable.on('error', (err) => {
-    //         throw err;
-    //     });
-    // });
 }
 
 export {parse};
