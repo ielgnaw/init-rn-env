@@ -3,17 +3,18 @@
  * @author ielgnaw(wuji0223@gmail.com)
  */
 
-import {createReadStream,existsSync,statSync} from 'fs';
+import {statSync} from 'fs';
 import {resolve} from 'path';
 import chalk from 'chalk';
-import {log} from 'edp-core';
 import sys from '../package';
-import {formatMsg, getCandidates, uniqueMsg} from './util';
-import {check} from './checker';
-import {exec} from 'child_process';
+import {formatMsg} from './util';
+import {exec,spawn} from 'child_process';
 import async from 'async';
 
 'use strict';
+
+const REGISTRY = 'https://registry.npm.taobao.org';
+const DISTURL = 'https://npm.taobao.org/dist';
 
 /**
  * 显示默认的信息
@@ -29,7 +30,6 @@ function showDefaultInfo() {
     console.log(chalk.white.bold('  $ ire'));
     console.log();
     console.log('Initialize react-native development environment in dirPath');
-    // console.log('under dirpath catalog, initialize react-native exploitation environment.');
     console.log(chalk.white.bold('  $ ire dirPath'));
 }
 
@@ -42,12 +42,12 @@ function getNpmConfig() {
     return new Promise((resolve, reject) => {
         async.parallel([
             (cb) => {
-                exec('npm config get registry', (e, stdout, stderr) => {
+                exec('npm config get registry', (e, stdout) => {
                     cb(e, stdout.replace(/\n*$/, ''));
                 });
             },
             (cb) => {
-                exec('npm config get disturl', (e, stdout, stderr) => {
+                exec('npm config get disturl', (e, stdout) => {
                     cb(e, stdout.replace(/\n*$/, ''));
                 });
             }
@@ -60,17 +60,50 @@ function getNpmConfig() {
     });
 }
 
-function runVerbose(root, projectName, rnPackage) {
-  var proc = spawn('npm', ['install', '--verbose', '--save', getInstallPackage(rnPackage)], {stdio: 'inherit'});
-  proc.on('close', function (code) {
-    if (code !== 0) {
-      console.error('`npm install --save react-native` failed');
-      return;
+/**
+ * set npm config registry
+ *
+ * @param {string} src registry 值
+ */
+function setNpmRegistry(src) {
+    var proc = spawn('npm', ['config', 'set', 'registry', src], {stdio: 'inherit'});
+    proc.on('close', function (code) {
+        if (code !== 0) {
+            console.error(chalk.bold.red('`npm config set registry` failed'));
+            process.exit(1);
+        }
+    });
+}
+
+/**
+ * set npm config disturl
+ *
+ * @param {string} src disturl 值
+ */
+function setNpmDisturl(src) {
+    var op = 'set';
+    if (!src || src === 'undefined') {
+        op = 'delete';
     }
 
-    cli = require(CLI_MODULE_PATH());
-    cli.init(root, projectName);
-  });
+    var proc = spawn('npm', ['config', op, 'disturl', src], {stdio: 'inherit'});
+    proc.on('close', function (code) {
+        if (code !== 0) {
+            console.error(chalk.bold.red('`npm config set disturl` failed'));
+            process.exit(1);
+        }
+    });
+}
+
+/**
+ * 还原 npm config
+ *
+ * @param {string} registry registry 值
+ * @param {string} disturl disturl 值
+ */
+function reset(registry, disturl) {
+    setNpmRegistry(registry);
+    setNpmDisturl(disturl);
 }
 
 /**
@@ -117,7 +150,50 @@ function parse(args) {
     getNpmConfig().then((ret) => {
         npmRegistryOriginal = ret[0];
         npmDisturlOriginal = ret[1];
-        console.warn(npmRegistryOriginal, npmDisturlOriginal);
+
+        process.on('SIGINT', () => {
+            reset(npmRegistryOriginal, npmDisturlOriginal);
+        });
+
+        async.auto({
+            setConfig: (cb) => {
+                setNpmRegistry(REGISTRY);
+                setNpmDisturl(DISTURL);
+                cb(null);
+            },
+            mkFolder: (cb) => {
+                exec(`mkdir ${folderName}`, (e) => {
+                    cb(e);
+                });
+            },
+            process: ['setConfig', 'mkFolder', (cb) => {
+                var proc = spawn('sh', [resolve(__dirname, 'init.sh'), folderName], {
+                    stdio: 'inherit',
+                    cwd: absolutePath
+                });
+                proc.on('close', function (code) {
+                    if (code !== 0) {
+                        console.error('`run init.sh` failed');
+                        cb(code);
+                    }
+                    else {
+                        cb(null);
+                    }
+                });
+            }],
+            reset: ['process', (cb) => {
+                reset(npmRegistryOriginal, npmDisturlOriginal);
+                cb();
+            }]
+        }, (err) => {
+            if (err) {
+                reset(npmRegistryOriginal, npmDisturlOriginal);
+                return;
+            }
+        });
+
+
+
     }, (err) => {
         console.warn('err', err);
         process.exit(1);
