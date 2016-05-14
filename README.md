@@ -3,17 +3,15 @@ init-rn-env
 
 Initialize react-native development environment
 
-安装与更新
+Install & Update
 -------
 
     $ [sudo] npm install init-rn-env -g
 
-升级 `init-rn-env` 请用如下命令。
-
     $ [sudo] npm update init-rn-env -g
     
 
-使用
+Usage
 ------
 
 Show default info
