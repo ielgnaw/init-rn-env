@@ -66,8 +66,8 @@ function getNpmConfig() {
  * @param {string} src registry 值
  */
 function setNpmRegistry(src) {
-    var proc = spawn('npm', ['config', 'set', 'registry', src], {stdio: 'inherit'});
-    proc.on('close', function (code) {
+    let proc = spawn('npm', ['config', 'set', 'registry', src], {stdio: 'inherit'});
+    proc.on('close', (code) => {
         if (code !== 0) {
             console.error(chalk.bold.red('`npm config set registry` failed'));
             process.exit(1);
@@ -81,13 +81,13 @@ function setNpmRegistry(src) {
  * @param {string} src disturl 值
  */
 function setNpmDisturl(src) {
-    var op = 'set';
+    let op = 'set';
     if (!src || src === 'undefined') {
         op = 'delete';
     }
 
-    var proc = spawn('npm', ['config', op, 'disturl', src], {stdio: 'inherit'});
-    proc.on('close', function (code) {
+    let proc = spawn('npm', ['config', op, 'disturl', src], {stdio: 'inherit'});
+    proc.on('close', (code) => {
         if (code !== 0) {
             console.error(chalk.bold.red('`npm config set disturl` failed'));
             process.exit(1);
@@ -167,11 +167,11 @@ function parse(args) {
                 });
             },
             process: ['setConfig', 'mkFolder', (cb) => {
-                var proc = spawn('sh', [resolve(__dirname, 'init.sh'), folderName], {
+                let proc = spawn('sh', [resolve(__dirname, 'init.sh'), folderName], {
                     stdio: 'inherit',
                     cwd: absolutePath
                 });
-                proc.on('close', function (code) {
+                proc.on('close', (code) => {
                     if (code !== 0) {
                         console.error('`run init.sh` failed');
                         cb(code);
