@@ -50,6 +50,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:ecomfe/node-lesslint"
+    "url": "git@github.com:ielgnaw/init-rn-env.git"
   }
 }

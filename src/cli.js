@@ -4,11 +4,13 @@
  */
 
 import {createReadStream} from 'fs';
+import {resolve} from 'path';
 import chalk from 'chalk';
 import {log} from 'edp-core';
 import sys from '../package';
 import {formatMsg, getCandidates, uniqueMsg} from './util';
 import {check} from './checker';
+import {exec} from 'child_process';
 
 'use strict';
 
@@ -77,7 +79,35 @@ function parse(args) {
         args.push('.');
     }
 
-    console.warn(12312);
+    exec('npm config get registry', (e, stdout, stderr) => {
+        console.log(`stdout1: ${stdout}`);
+        console.log(`stderr2: ${stderr}`);
+        if (e !== null) {
+            console.log(`exec error: ${e}`);
+            process.exit(1);
+        }
+    });
+    // c.stdout.on('data', function (data) {
+    //     console.log('stdout22222: ' + data);
+    // });
+
+    // c.stderr.on('data', function (data) {
+    //     console.log('stderr11111: ' + data);
+    // });
+
+    // c.on('exit', function (code) {
+    //     console.log('child process exited with code ' + code);
+    // });
+
+    // exec('npm config get registry', (error, stdout, stderr) => {
+    //     console.log(`stdout1: ${stdout}`);
+    //     console.log(`stderr2: ${stderr}`);
+    //     if (error !== null) {
+    //         console.log(`exec error3: ${error}`);
+    //     }
+    // });
+
+    // console.warn(resolve(process.cwd(), 'node_modules', 'react-native', 'cli.js'));
 
     // if (args[0] === '--version' || args[0] === '-v') {
     //     showDefaultInfo();
